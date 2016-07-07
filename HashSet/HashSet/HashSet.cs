@@ -14,6 +14,7 @@ namespace HashSet
      * Основан на хэш таблице. 
      * Разрешение коллизий методом двойного хэширования.
      * H(key,attempts)=mainH(key)+attempts*offH(key)
+     * Some commentary for githib test
      */
 
     #region Proxy
