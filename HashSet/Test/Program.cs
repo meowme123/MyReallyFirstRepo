@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MySet=HashSet;
 
 
 namespace Test
@@ -13,7 +14,7 @@ namespace Test
     {
         static void Main(string[] args)
         {
-            var set=new HashSet.HashSet<int>();
+            var set=new MySet.HashSet<int>();
             var micrset=new HashSet<int>();
             
             var watch = new Stopwatch();

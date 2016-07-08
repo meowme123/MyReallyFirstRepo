@@ -9,12 +9,14 @@ namespace HashSet
     /*
      * HashSet
      * Dmitriy Karachev
-     * 07.07.16
+     * 08.07.16
      * 
      * Основан на хэш таблице. 
      * Разрешение коллизий методом двойного хэширования.
      * H(key,attempts)=mainH(key)+attempts*offH(key)
-     * Some commentary for githib test
+     * 
+     * mainH(key)= (key.GetHashCode() & 0x7FFFFFFF) % length_of_array
+     * offH(key)=1+mainH(key) % length_of_array-1
      */
 
     #region Proxy
@@ -49,6 +51,7 @@ namespace HashSet
 
         private const double LoadFactor = 0.8;//[0.1,1] 
         private const int DefaultCapacity = 4;
+
         #endregion
 
         #region Fields
@@ -81,6 +84,14 @@ namespace HashSet
         {
             Init(capacity,equalityComparer);
         }
+
+        public HashSet(IEnumerable<T> collection) : this(collection, null) { }
+
+        public HashSet(IEnumerable<T> collection, IEqualityComparer<T> equalityComparer)
+            : this(DefaultCapacity, equalityComparer)
+        {
+            UnionWith(collection);
+        } 
         #endregion
 
         #region Methods
@@ -91,26 +102,20 @@ namespace HashSet
 
             int hash;
             var mainhash = GetMainHash(item, _entries.Length, out hash);
-            var offhash = GetOffHash(mainhash, _entries.Length);
-
             var index = mainhash;
+            if (TryToAdd(item, hash, index)) return true;
+            
+            var offhash = GetOffHash(mainhash, _entries.Length);
 
             while (true)
             {
-                if (IsEntryEmpty(_entries, index))
-                {
-                    _entries[index].HashCode = hash;
-                    _entries[index].Value = item;
-                    _count++;
-                    _version++;
-                    return true;
-                }
-
                 if (_entries[index].HashCode == hash && _eqComparer.Equals(_entries[index].Value, item))
                     return false;
 
                 index += offhash;
                 index %= _entries.Length;
+
+                if (TryToAdd(item, hash, index)) return true;
             }
         }
 
@@ -121,22 +126,12 @@ namespace HashSet
 
         public bool Contains(T item)
         {
-            int hash;
-            var mainhash = GetMainHash(item, _entries.Length, out hash);
-            var offhash = GetOffHash(mainhash, _entries.Length);
+            return FindEntry(item) >= 0;
+        }
 
-            var index = mainhash;
-
-            while (true)
-            {
-                if (IsEntryEmpty(_entries, index)) return false;
-
-                if (_entries[index].HashCode == hash && _eqComparer.Equals(_entries[index].Value, item))
-                    return true;
-
-                index += offhash;
-                index %= _entries.Length;
-            }
+        public void CopyTo(T[] array)
+        {
+            CopyTo(array, 0);
         }
 
         public void CopyTo(T[] array, int arrayIndex)
@@ -157,28 +152,34 @@ namespace HashSet
 
         public bool Remove(T item)
         {
-            int hash;
-            var mainhash = GetMainHash(item, _entries.Length, out hash);
-            var offhash = GetOffHash(mainhash, _entries.Length);
+            var index = FindEntry(item);
+            if (index < 0) return false;
 
-            var index = mainhash;
+            ClearEntry(_entries, index);
+            _version++;
+            _count--;
 
-            while (true)
+            return true;
+        }
+
+        public int RemoveWhere(Predicate<T> match)
+        {
+            int removeNum = 0;
+
+            for (int i = 0; i < _entries.Length; i++)
             {
-                if (IsEntryEmpty(_entries, index)) return false;
+                if (IsEntryEmpty(_entries, i)) continue;
 
-                if (_entries[index].HashCode == hash && _eqComparer.Equals(_entries[index].Value, item))
+                if (match(_entries[i].Value))
                 {
-                    _entries[index].HashCode = -1;
-                    _entries[index].Value = default(T);
-                    _version++;
+                    ClearEntry(_entries, i);
                     _count--;
-                    return true;
+                    _version++;
+                    removeNum++;
                 }
-
-                index += offhash;
-                index %= _entries.Length;
             }
+
+            return removeNum;
         }
 
         void ICollection<T>.Add(T item)
@@ -221,9 +222,9 @@ namespace HashSet
 
                 if (intersectEnriesIndexes.Remove(i)) continue;
 
-                _entries[i].HashCode = -1;
-                _entries[i].Value = default(T);//TODO: добавить метод очистить запись
+                ClearEntry(_entries, i);
                 _count--;
+                _version++;
             }
         }
 
@@ -266,6 +267,9 @@ namespace HashSet
 
         public bool IsSupersetOf(IEnumerable<T> other)//Надмноженство
         {
+            if (other == null)
+                throw new ArgumentNullException("Аргумент не должен принимать значение null");
+
             foreach (T item in other)
             {
                 if (!Contains(item)) return false;
@@ -275,6 +279,9 @@ namespace HashSet
 
         public bool IsProperSupersetOf(IEnumerable<T> other)
         {
+            if (other == null)
+                throw new ArgumentNullException("Аргумент не должен принимать значение null");
+
             int count = 0;
             foreach (T item in other)
             {
@@ -301,6 +308,9 @@ namespace HashSet
 
         public bool Overlaps(IEnumerable<T> other)
         {
+            if (other == null)
+                throw new ArgumentNullException("Аргумент не должен принимать значение null");
+
             foreach (T item in other)
             {
                 if (Contains(item)) return true;
@@ -310,6 +320,9 @@ namespace HashSet
 
         public bool SetEquals(IEnumerable<T> other)
         {
+            if (other == null)
+                throw new ArgumentNullException("Аргумент не должен принимать значение null");
+
             int count = 0;
             foreach (T item in other)
             {
@@ -427,11 +440,40 @@ namespace HashSet
             }
         }
 
+        private static void ClearEntry(Entry[] entries,int index)
+        {
+            entries[index].Value = default(T);
+            entries[index].HashCode = -1;
+        }
+
+        private void ClearEntryOfMainArray(int index)
+        {
+            ClearEntry(_entries, index);
+            _count--;
+            _version++;
+        }
         private static bool IsEntryEmpty(Entry[] entries,int index)
         {
             return entries[index].HashCode == -1;
         }
 
+        private bool IsEntryOfMainArrayEmpty(int index)
+        {
+            return IsEntryEmpty(_entries, index);
+        }
+
+        private bool TryToAdd(T item, int hash, int index)
+        {
+            if (IsEntryEmpty(_entries, index))
+            {
+                _entries[index].HashCode = hash;
+                _entries[index].Value = item;
+                _count++;
+                _version++;
+                return true;
+            }
+            return false;
+        }
         #endregion
 
         #region Nested types
