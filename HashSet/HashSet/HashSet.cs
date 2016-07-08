@@ -145,8 +145,7 @@ namespace HashSet
             {
                 if (IsEntryEmpty(_entries, i)) continue;
 
-                array[arrayIndex] = _entries[i].Value;
-                arrayIndex++;
+                array[arrayIndex++] = _entries[i].Value;
             }
         }
 
@@ -250,6 +249,7 @@ namespace HashSet
                     Add(item);
             }
         }
+
         public bool IsSubsetOf(IEnumerable<T> other)//Подмножество
         {
             if (other == null)

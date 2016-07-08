@@ -10,3 +10,16 @@
 /HashSet/Test/bin/Debug
 /HashSet/UnitTest/bin/Debug/ru/Microsoft.VisualStudio.QualityTools.UnitTestFramework.resources.dll
 /HashSet/UnitTest/bin/Debug
+/HashSet/HashSet/bin/Release
+/HashSet/HashSet/obj/Release
+/HashSet/Test/bin/Release/HashSet.dll
+/HashSet/Test/bin/Release/HashSet.pdb
+/HashSet/Test/bin/Release/Test.exe
+/HashSet/Test/bin/Release/Test.exe.config
+/HashSet/Test/bin/Release/Test.vshost.exe
+/HashSet/Test/bin/Release/Test.pdb
+/HashSet/Test/bin/Release/Test.vshost.exe.config
+/HashSet/Test/bin/Release/Test.vshost.exe.manifest
+/HashSet/Test/obj/Release
+/HashSet/UnitTest/bin/Release
+/HashSet/UnitTest/obj/Release

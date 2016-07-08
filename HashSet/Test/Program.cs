@@ -25,6 +25,8 @@ namespace Test
             {
                 set.Add(rnd.Next(0, 100000));
             }
+
+
             watch.Stop();
             Console.WriteLine(watch.Elapsed);
             watch.Reset();
@@ -50,6 +52,9 @@ namespace Test
             var notmy = GetDictionary(words);
             watch.Stop();
             Console.WriteLine(watch.Elapsed);
+
+            Console.WriteLine();
+            var notnot=new HashSet<int>();
             Console.ReadKey();
         }
 
@@ -67,7 +72,7 @@ namespace Test
 
 
 
-        public static HashSet.HashSet<string> GetTable(string[] words)
+        public static MySet.HashSet<string> GetTable(string[] words)
         {
             var table = new HashSet.HashSet<string>();
             foreach (var word in words)

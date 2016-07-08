@@ -442,5 +442,17 @@ namespace UnitTest
                 set.Add(100);
             }
         }
+
+        [TestMethod]
+        public void RemoveWhereTest()
+        {
+            var set = new HashSet<int>(Enumerable.Range(0, 100));
+            set.RemoveWhere(a => a%2 == 0);
+            Assert.AreEqual(set.Count, 50);
+            for (int i = 1; i < 100; i+=2)
+            {
+                Assert.IsTrue(set.Contains(i));
+            }
+        }
     }
 }
