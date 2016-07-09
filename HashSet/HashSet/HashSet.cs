@@ -16,8 +16,16 @@ namespace HashSet
      * H(key,attempts)=mainH(key)+attempts*offH(key)
      * 
      * mainH(key)= (key.GetHashCode() & 0x7FFFFFFF) % length_of_array
-     * offH(key)=1+mainH(key) % length_of_array-1
+     * offH(key)=1+mainH(key) % (length_of_array-1)
      * 
+     * Циклы вида:
+     * While(True)
+     * {
+     *   Some code
+     * }
+     * 
+     * в методах добавления\поиска не бесконечны. Гарантируется выход из них, так как своевременно производится
+     * переназначение размера массива, и длина массива всегда равна простому числу.
      */
 
     #region Proxy
@@ -228,6 +236,7 @@ namespace HashSet
 
             _countLimit = Convert.ToInt32(LoadFactor*newsize);
             Rehash(newsize);
+            _version++;
         }
 
         /// <summary>

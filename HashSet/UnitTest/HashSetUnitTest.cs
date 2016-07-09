@@ -496,5 +496,16 @@ namespace UnitTest
             set.TrimExcess();
             Assert.AreEqual(set.Count, 0);
         }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void EnumerableBreakAfterTrimExcess()
+        {
+            var set = new HashSet<int>(Enumerable.Range(0, 10));
+            foreach (var item in set)
+            {
+                set.TrimExcess();
+            }
+        }
     }
 }

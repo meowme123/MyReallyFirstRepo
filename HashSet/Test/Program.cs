@@ -34,12 +34,17 @@ namespace Test
             watch.Start();
             for (int i = 0; i < 100000; i++)
             {
-                micrset.Add(rnd.Next(0, 100000));
+                micrset.Add(rnd.Next(50000, 150000));
             }
             watch.Stop();
             Console.WriteLine(watch.Elapsed);
 
-       
+            watch.Reset();
+            watch.Start();
+           micrset.SymmetricExceptWith(set);
+            watch.Stop();
+            Console.WriteLine("\n\n"+watch.Elapsed+"\n\n");
+            watch.Reset();
             var words = GetWords();
 
             watch.Restart();
