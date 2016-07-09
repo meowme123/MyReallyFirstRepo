@@ -21,7 +21,7 @@ namespace Test
             var rnd = new Random();
 
             watch.Start();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100000; i++)
             {
                 set.Add(rnd.Next(0, 100000));
             }
@@ -32,7 +32,7 @@ namespace Test
             watch.Reset();
 
             watch.Start();
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 100000; i++)
             {
                 micrset.Add(rnd.Next(0, 100000));
             }

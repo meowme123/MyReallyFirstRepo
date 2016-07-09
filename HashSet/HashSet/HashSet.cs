@@ -9,7 +9,7 @@ namespace HashSet
     /*
      * HashSet
      * Dmitriy Karachev
-     * 08.07.16
+     * 09.07.16
      * 
      * Основан на хэш таблице. 
      * Разрешение коллизий методом двойного хэширования.
@@ -17,6 +17,7 @@ namespace HashSet
      * 
      * mainH(key)= (key.GetHashCode() & 0x7FFFFFFF) % length_of_array
      * offH(key)=1+mainH(key) % length_of_array-1
+     * 
      */
 
     #region Proxy
@@ -45,7 +46,7 @@ namespace HashSet
 
     [DebuggerDisplay("Count = {Count}")]
     [DebuggerTypeProxy(typeof(HashSetProxy<>))]
-    public class HashSet<T>:ISet<T>
+    public class HashSet<T> : ISet<T>
     {
         #region Consts and static fields
 
@@ -60,8 +61,8 @@ namespace HashSet
         private int _count;
         private int _countLimit;//Для Resize()
         private int _version;
-        private IEqualityComparer<T> _eqComparer; 
-             
+        private IEqualityComparer<T> _eqComparer;
+
         #endregion
 
         #region Properties
@@ -77,12 +78,12 @@ namespace HashSet
         public HashSet() : this(DefaultCapacity, null) { }
 
         public HashSet(int capacity) : this(capacity, null) { }
-        
-        public HashSet(IEqualityComparer<T> equalityComparer) : this(DefaultCapacity, equalityComparer) { } 
+
+        public HashSet(IEqualityComparer<T> equalityComparer) : this(DefaultCapacity, equalityComparer) { }
 
         public HashSet(int capacity, IEqualityComparer<T> equalityComparer)
         {
-            Init(capacity,equalityComparer);
+            Init(capacity, equalityComparer);
         }
 
         public HashSet(IEnumerable<T> collection) : this(collection, null) { }
@@ -91,11 +92,18 @@ namespace HashSet
             : this(DefaultCapacity, equalityComparer)
         {
             UnionWith(collection);
-        } 
+        }
         #endregion
 
         #region Methods
 
+        /// <summary>
+        /// Добавляет элемент в множество. 
+        /// Если элемент уже есть в множестве, то он не добавляется.
+        /// Возвращает true, если элемент был добавлен.
+        /// </summary>
+        /// <param name="item">Добавляемый элемент</param>
+        /// <returns>True, если элемент добавлен, иначе False.</returns>
         public bool Add(T item)
         {
             if (_count == _countLimit) Resize();
@@ -103,8 +111,8 @@ namespace HashSet
             int hash;
             var mainhash = GetMainHash(item, _entries.Length, out hash);
             var index = mainhash;
-            if (TryToAdd(item, hash, index)) return true;
-            
+            if (AddInMainArrayIfEntryIsEmpty(item, hash, index)) return true;
+
             var offhash = GetOffHash(mainhash, _entries.Length);
 
             while (true)
@@ -115,65 +123,91 @@ namespace HashSet
                 index += offhash;
                 index %= _entries.Length;
 
-                if (TryToAdd(item, hash, index)) return true;
+                if (AddInMainArrayIfEntryIsEmpty(item, hash, index)) return true;
             }
         }
-
+         
+        /// <summary>
+        /// Удаляет все элементы из множества
+        /// </summary>
         public void Clear()
         {
             Init(0, _eqComparer);
         }
 
+        /// <summary>
+        /// Проверяет, содержится ли указанный элемент в множестве.
+        /// Возвращает True, если элемент содержится в множестве, иначе False.
+        /// </summary>
+        /// <param name="item">Элемент, подвергающийся проверке.</param>
+        /// <returns>True, если элемент содержится в множестве, иначе False.</returns>
         public bool Contains(T item)
-        {
+        {    
             return FindEntry(item) >= 0;
         }
 
+        /// <summary>
+        /// Копирует все элементы множества в указанный массив, начиная с нулевого индекса.
+        /// </summary>
+        /// <param name="array">Массив, в который будут скопированы элементы множества.</param>
         public void CopyTo(T[] array)
         {
             CopyTo(array, 0);
         }
 
+        /// <summary>
+        /// Копирует все элементы множества в указанный массив, начиная с указанного индекса.
+        /// </summary>
+        /// <param name="array">Массив, в который будут скопированы элементы множества.</param>
+        /// <param name="arrayIndex">Индекс массива, с которого начнется копирование в массив.</param>
         public void CopyTo(T[] array, int arrayIndex)
         {
             if (arrayIndex > array.Length)
                 throw new ArgumentOutOfRangeException("Индекс массива выходит за пределы длины массива");
-            if (array.Length < _count + arrayIndex) 
+            if (array.Length < _count + arrayIndex)
                 throw new ArgumentException("Массив не имеет достаточно места");
 
             for (int i = 0; i < _entries.Length; i++)
             {
-                if (IsEntryEmpty(_entries, i)) continue;
+                if (IsEntryOfMainArrayEmpty(i)) continue;
 
                 array[arrayIndex++] = _entries[i].Value;
             }
         }
 
+        /// <summary>
+        /// Удаляет указанный элемент из множества, если он содержится в нем.
+        /// Возвращает True, если элемент был успешно удален, иначе False.
+        /// </summary>
+        /// <param name="item">Элемент, который требуется удалить</param>
+        /// <returns>True, если элемент был успешно удален, иначе False.</returns>
         public bool Remove(T item)
         {
             var index = FindEntry(item);
             if (index < 0) return false;
 
-            ClearEntry(_entries, index);
-            _version++;
-            _count--;
+            ClearEntryOfMainArray(index);
 
             return true;
         }
 
+        /// <summary>
+        /// Удаляет все элементы из множества, которые удовлетворяют указанному предикату.
+        /// Возвращает количество удаленных элементов.
+        /// </summary>
+        /// <param name="match">Предикат, по которому будут определятся удаляемые элементы</param>
+        /// <returns>Количество удаленных элементов.</returns>
         public int RemoveWhere(Predicate<T> match)
         {
             int removeNum = 0;
 
             for (int i = 0; i < _entries.Length; i++)
             {
-                if (IsEntryEmpty(_entries, i)) continue;
+                if (IsEntryOfMainArrayEmpty(i)) continue;
 
                 if (match(_entries[i].Value))
                 {
-                    ClearEntry(_entries, i);
-                    _count--;
-                    _version++;
+                    ClearEntryOfMainArray(i);
                     removeNum++;
                 }
             }
@@ -181,6 +215,26 @@ namespace HashSet
             return removeNum;
         }
 
+        /// <summary>
+        /// Задает емкость множества равной фактическому количеству находящихся в множестве элементов.
+        /// </summary>
+        public void TrimExcess()
+        {
+            if (_count == 0) return;
+
+            var newsize = HashHelper.GetPrime(
+                Convert.ToInt32((_count + 1)/LoadFactor)
+                );
+
+            _countLimit = Convert.ToInt32(LoadFactor*newsize);
+            Rehash(newsize);
+        }
+
+        /// <summary>
+        /// Добавляет элемент в множество. 
+        /// Если элемент уже есть в множестве, то он не добавляется.
+        /// </summary>
+        /// <param name="item">Добавляемый элемент</param>
         void ICollection<T>.Add(T item)
         {
             Add(item);
@@ -190,9 +244,14 @@ namespace HashSet
 
         #region ISet methods
 
+        /// <summary>
+        /// Изменяет множество так, чтобы оно содержало все элементы, которые содержатся в нем
+        /// или в указанной коллекции либо как в нем, так и в указанной коллекции.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
         public void UnionWith(IEnumerable<T> other)
         {
-            if(other==null)
+            if (other == null)
                 throw new ArgumentNullException("Аргумент не должен принимать значение null");
 
             foreach (T item in other)
@@ -201,13 +260,18 @@ namespace HashSet
             }
         }
 
+        /// <summary>
+        /// Изменяет множество так, чтобы в нем содержались только элементы, которые содержатся как в множестве,
+        /// так и в указанной коллекции.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
         public void IntersectWith(IEnumerable<T> other)
         {
-            if(other==null)
+            if (other == null)
                 throw new ArgumentNullException("Аргумент не должен принимать значение null");
 
             if (_count == 0) return;
-            var intersectEnriesIndexes=new HashSet<int>();
+            var intersectEnriesIndexes = new HashSet<int>();
             foreach (T item in other)
             {
                 var index = FindEntry(item);
@@ -217,16 +281,18 @@ namespace HashSet
 
             for (int i = 0; i < _entries.Length; i++)
             {
-                if (IsEntryEmpty(_entries, i)) continue;
+                if (IsEntryOfMainArrayEmpty(i)) continue;
 
                 if (intersectEnriesIndexes.Remove(i)) continue;
 
-                ClearEntry(_entries, i);
-                _count--;
-                _version++;
+                ClearEntryOfMainArray(i);
             }
         }
 
+        /// <summary>
+        /// Удаляет из множества все элементы, которые содержатся в указанной коллекции.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
         public void ExceptWith(IEnumerable<T> other)
         {
             if (other == null)
@@ -238,6 +304,11 @@ namespace HashSet
             }
         }
 
+        /// <summary>
+        /// Изменяет множество так, чтобы в нем содержались элементы из этого множества и из указанной коллекции,
+        /// но не одновременно в обоих.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
         public void SymmetricExceptWith(IEnumerable<T> other)
         {
             if (other == null)
@@ -250,7 +321,13 @@ namespace HashSet
             }
         }
 
-        public bool IsSubsetOf(IEnumerable<T> other)//Подмножество
+        /// <summary>
+        /// Определяет, содержатся ли все элементы множества в указанной коллекции.
+        /// Возвращает True, если содержатся, иначе False.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
+        /// <returns>True, если содержатся, иначе False.</returns>
+        public bool IsSubsetOf(IEnumerable<T> other)
         {
             if (other == null)
                 throw new ArgumentNullException("Аргумент не должен принимать значение null");
@@ -265,7 +342,13 @@ namespace HashSet
             return indexesOfOtherInSet.Count == _count;
         }
 
-        public bool IsSupersetOf(IEnumerable<T> other)//Надмноженство
+        /// <summary>
+        /// Определяет, содержатся ли все элементы из указанной коллекции в множестве.
+        /// Возвращает True, если содержатся, иначе False.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
+        /// <returns>True, если содержатся, иначе False.</returns>
+        public bool IsSupersetOf(IEnumerable<T> other)
         {
             if (other == null)
                 throw new ArgumentNullException("Аргумент не должен принимать значение null");
@@ -277,6 +360,13 @@ namespace HashSet
             return true;
         }
 
+        /// <summary>
+        /// Определяет, содержатся ли все элементы из указанной коллекции в множестве
+        ///  и множество с указанной коллекцией не совпадают.
+        /// Возвращает True, если содержатся и коллекции не совпадают, иначе False.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
+        /// <returns>True, если содержатся и множество с указанной коллекцией не совпадают, иначе False.</returns>
         public bool IsProperSupersetOf(IEnumerable<T> other)
         {
             if (other == null)
@@ -291,6 +381,13 @@ namespace HashSet
             return count != _count;
         }
 
+        /// <summary>
+        /// Определяет, содержатся ли все элементы из множества в указанной коллекции 
+        /// и множество с указанной коллекцией не совпадают.
+        /// Возвращает True, если содержатся и множество с указанной коллекцией не совпадают, иначе False.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
+        /// <returns>True, если содержатся и множество с указанной коллекцией не совпадают, иначе False.</returns>
         public bool IsProperSubsetOf(IEnumerable<T> other)
         {
             if (other == null)
@@ -303,9 +400,15 @@ namespace HashSet
                 indexesOfOtherInSet.Add(index);
             }
 
-            return indexesOfOtherInSet.Count-1 == _count;
+            return indexesOfOtherInSet.Count - 1 == _count;
         }
 
+        /// <summary>
+        /// Определяет, содержится ли хоть один элемент из указанной коллекции в множестве.
+        /// Возвращает True, если содержится, иначе False.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
+        /// <returns>True, если содержится, иначе False.</returns>
         public bool Overlaps(IEnumerable<T> other)
         {
             if (other == null)
@@ -318,6 +421,12 @@ namespace HashSet
             return false;
         }
 
+        /// <summary>
+        /// Определяет, совпадает ли множество с указанной коллекцией.
+        /// Возращает True, если совпадает, иначе False.
+        /// </summary>
+        /// <param name="other">Коллекция для сравнения с множеством.</param>
+        /// <returns>True, если совпадает, иначе False.</returns>
         public bool SetEquals(IEnumerable<T> other)
         {
             if (other == null)
@@ -342,7 +451,7 @@ namespace HashSet
             for (int i = 0; i < _entries.Length; i++)
             {
                 if (version != _version) throw new InvalidOperationException("Коллекция была изменена");
-                if (IsEntryEmpty(_entries, i)) continue;
+                if (IsEntryOfMainArrayEmpty(i)) continue;
                 yield return _entries[i].Value;
             }
         }
@@ -356,80 +465,126 @@ namespace HashSet
 
         #region Internal and private methods
 
-        private void Init(int capacity,IEqualityComparer<T> comparer)
+        /// <summary>
+        /// Инициализирует множество.
+        /// </summary>
+        private void Init(int capacity, IEqualityComparer<T> comparer)
         {
-            var realsize = Convert.ToInt32(capacity/LoadFactor);
+            capacity = (capacity < DefaultCapacity) ? DefaultCapacity : capacity;
+
+            var realsize = Convert.ToInt32(capacity / LoadFactor);
             realsize = HashHelper.GetPrime(realsize);
             _entries = new Entry[realsize];
             _count = 0;
-            _countLimit = Convert.ToInt32(realsize*LoadFactor);
+            _countLimit = Convert.ToInt32(realsize * LoadFactor);
             _version = 0;
             _eqComparer = comparer ?? EqualityComparer<T>.Default;
 
             for (int i = 0; i < _entries.Length; i++)
             {
-                _entries[i].HashCode = -1;
+                InitDefaultEntry(_entries, i);
             }
         }
 
-        private int GetMainHash(T value,int length,out int hash)
+        /// <summary>
+        /// Возвращает значение первой хэш-функции.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="length"></param>
+        /// <param name="hash"></param>
+        /// <returns></returns>
+        private int GetMainHash(T value, int length, out int hash)
         {
             hash = _eqComparer.GetHashCode(value) & 0x7FFFFFFF;
-            var mainhash = hash%length;
+            var mainhash = hash % length;
             return mainhash;
         }
 
-        private int GetOffHash(int mainhash,int length)
+        /// <summary>
+        /// Возвращает значение второй хэш-функции.
+        /// </summary>
+        /// <param name="mainhash"></param>
+        /// <param name="length"></param>
+        /// <returns></returns>
+        private int GetOffHash(int mainhash, int length)
         {
-            return 1 + mainhash%(length - 1);
-        }       
+            return 1 + mainhash % (length - 1);
+        }
 
+        /// <summary>
+        /// Производит изменение размера главного массива.
+        /// </summary>
         private void Resize()
         {
-            var newsize = HashHelper.GetPrime(2*_entries.Length);
+            var newsize = HashHelper.GetPrime(2 * _entries.Length);
+
+            Rehash(newsize);
+
+            _version++;
+            _countLimit = Convert.ToInt32(LoadFactor * newsize);
+        }
+
+        /// <summary>
+        /// Пересчитывает хэши всех элементов главного массива и перераспределяет эти элементы
+        /// в другой массив.
+        /// </summary>
+        /// <param name="newsize"></param>
+        private void Rehash(int newsize)
+        {
             var newentries = new Entry[newsize];
             for (int i = 0; i < newentries.Length; i++)
             {
-                newentries[i].HashCode = -1;
+                InitDefaultEntry(newentries, i);
             }
 
             for (int i = 0; i < _entries.Length; i++)
             {
-                if (IsEntryEmpty(_entries, i)) continue;
+                if (IsEntryOfMainArrayEmpty(i)) continue;
 
-                int hash;
-                var mainhash = GetMainHash(_entries[i].Value, newentries.Length, out hash);
-                var offhash = GetOffHash(mainhash, newentries.Length);
-                var index = mainhash;
-
-                while (true)
-                {
-                    if (IsEntryEmpty(newentries, index))
-                    {
-                        newentries[index].HashCode = hash;
-                        newentries[index].Value = _entries[i].Value;
-                        break;
-                    }
-                    index += offhash;
-                    index %= newentries.Length;
-                }
+                PutEntry(newentries, _entries[i].Value);
             }
-            _version++;
             _entries = newentries;
-            _countLimit = Convert.ToInt32(LoadFactor*newentries.Length);
         }
 
+        /// <summary>
+        /// Вставляет указанный элемент в массив без проверки на повторы.
+        /// </summary>
+        /// <param name="entries"></param>
+        /// <param name="item"></param>
+        private void PutEntry(Entry[] entries, T item)
+        {
+            int hash;
+            var mainhash = GetMainHash(item, entries.Length, out hash);
+            var index = mainhash;
+            if (AddIfEntryIsEmpty(entries, item, hash, index)) return;
+
+            var offhash = GetOffHash(mainhash, entries.Length);
+
+            while (true)
+            {
+                if (AddIfEntryIsEmpty(entries, item, hash, index)) return;
+                index += offhash;
+                index %= entries.Length;
+            }
+        }
+
+        /// <summary>
+        /// Возвращает индекс главного массива, в котором находится указанный элемент.
+        /// Если указанного элемента нет в главном массиве, то возращается -1.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
         private int FindEntry(T item)
         {
             int hash;
             var mainhash = GetMainHash(item, _entries.Length, out hash);
+            var index = mainhash;
+            if (IsEntryOfMainArrayEmpty(index)) return -1;
+
             var offhash = GetOffHash(mainhash, _entries.Length);
 
-            var index = mainhash;
             while (true)
             {
-                if (IsEntryEmpty(_entries, index)) return -1;
-
                 if (_entries[index].HashCode == hash && _eqComparer.Equals(_entries[index].Value, item))
                 {
                     return index;
@@ -437,42 +592,91 @@ namespace HashSet
 
                 index += offhash;
                 index %= _entries.Length;
+
+                if (IsEntryOfMainArrayEmpty(index)) return -1;
             }
         }
 
-        private static void ClearEntry(Entry[] entries,int index)
+        /// <summary>
+        /// Очищает запись под указанным индексом в указанном массиве.
+        /// </summary>
+        private void ClearEntry(Entry[] entries, int index)
+        {
+            InitDefaultEntry(entries, index);
+        }
+
+        /// <summary>
+        /// Очищает запись под указанным индексом в главном массиве.
+        /// </summary>
+        private void ClearEntryOfMainArray(int index)
+        {
+            ClearEntry(_entries, index);
+            DecreaseCount();
+        }
+
+        /// <summary>
+        /// Инициализирует значение ячейки под указанным индексом в указанном массиве по умолчанию.
+        /// </summary>
+        private void InitDefaultEntry(Entry[] entries, int index)
         {
             entries[index].Value = default(T);
             entries[index].HashCode = -1;
         }
 
-        private void ClearEntryOfMainArray(int index)
-        {
-            ClearEntry(_entries, index);
-            _count--;
-            _version++;
-        }
-        private static bool IsEntryEmpty(Entry[] entries,int index)
+        /// <summary>
+        /// Определяет, является ли запись в ячейке указанного массива под указанным идексом пустой.
+        /// </summary>
+        private bool IsEntryEmpty(Entry[] entries, int index)
         {
             return entries[index].HashCode == -1;
         }
 
+        /// <summary>
+        /// Определяет, является ли запись в ячейке главного массива под указанным идексом пустой.
+        /// </summary>
         private bool IsEntryOfMainArrayEmpty(int index)
         {
             return IsEntryEmpty(_entries, index);
         }
 
-        private bool TryToAdd(T item, int hash, int index)
+        /// <summary>
+        /// Добавляет элемент в указанный массив, если нет записи в указанной ячейке массива.
+        /// </summary>
+        private bool AddIfEntryIsEmpty(Entry[] entries, T item, int hash, int index)
         {
-            if (IsEntryEmpty(_entries, index))
-            {
-                _entries[index].HashCode = hash;
-                _entries[index].Value = item;
-                _count++;
-                _version++;
-                return true;
-            }
-            return false;
+            if (!IsEntryEmpty(entries, index)) return false;
+
+            entries[index].HashCode = hash;
+            entries[index].Value = item;
+            return true;
+        }
+
+        /// <summary>
+        /// Добавляет элемент в главный массив, если нет записи в указанной ячейке массива.
+        /// </summary>
+        private bool AddInMainArrayIfEntryIsEmpty(T item, int hash, int index)
+        {
+            var isAdd = AddIfEntryIsEmpty(_entries, item, hash, index);
+            if (isAdd) RaiseCount();
+            return isAdd;
+        }
+
+        /// <summary>
+        /// Увеличивает размер счетчика.
+        /// </summary>
+        private void RaiseCount()
+        {
+            _count++;
+            _version++;
+        }
+
+        /// <summary>
+        /// Уменьшает размер счетчика.
+        /// </summary>
+        private void DecreaseCount()
+        {
+            _count--;
+            _version++;
         }
         #endregion
 

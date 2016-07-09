@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
-using HashSet;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using HashSet;
 
 namespace UnitTest
 {
@@ -15,6 +15,7 @@ namespace UnitTest
         {
             var set = new HashSet<int>();
             var limit = rnd.Next(1, 100);
+            limit = 100;
             for (int i = 0; i < limit; i++)
             {
                 set.Add(i);
@@ -284,6 +285,20 @@ namespace UnitTest
         }
 
         [TestMethod]
+        public void IsSubsetOfEmptySetTest()
+        {
+            var set = new HashSet<int>();
+            Assert.IsTrue(set.IsSubsetOf(Enumerable.Range(0, 10)));
+        }
+
+        [TestMethod]
+        public void IsSubsetOfEqualSetsTest()
+        {
+            var set = new HashSet<int>(Enumerable.Range(0, 10));
+            Assert.IsTrue(set.IsSubsetOf(Enumerable.Range(0,10)));
+        }
+
+        [TestMethod]
         public void IsSupersetOfFailureTest()
         {
             var set = new HashSet<int>();
@@ -316,6 +331,13 @@ namespace UnitTest
             var arr = Enumerable.Range(0, 10).ToArray();
             set.UnionWith(arr);
             Assert.IsTrue(set.IsSupersetOf(arr));
+        }
+
+        [TestMethod]
+        public void IsSupersetOfEmptyCollectionTest()
+        {
+            var set = new HashSet<int>(Enumerable.Range(0,10));
+            Assert.IsTrue(set.IsSupersetOf(Enumerable.Range(0,0)));
         }
 
         [TestMethod]
@@ -453,6 +475,26 @@ namespace UnitTest
             {
                 Assert.IsTrue(set.Contains(i));
             }
+        }
+
+        [TestMethod]
+        public void ImmutabilityAfterTrimExcessTest()
+        {
+            var set = new HashSet<int>(Enumerable.Range(0, 100));
+            set.TrimExcess();
+            Assert.AreEqual(set.Count, 100);
+            for (int i = 0; i < 100; i++)
+            {
+                Assert.IsTrue(set.Contains(i));
+            }
+        }
+
+        [TestMethod]
+        public void EmptySetTrimExcessTest()
+        {
+            var set=new HashSet<int>();
+            set.TrimExcess();
+            Assert.AreEqual(set.Count, 0);
         }
     }
 }
